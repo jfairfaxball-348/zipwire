@@ -60,3 +60,29 @@ The inverse identification is a *single underdamped Kelvin–Voigt mass–spring
 Apply estimate overwrites only current simulated spring parameters and creates a distinct **Observation-derived spring estimate** scenario. Apply & optimise reruns the bounded launch search with those same estimated parameters passed to the worker, rather than reverting to the unmeasured reference. No uploads, tracking or browser persistence; page refresh clears measurements. Underlying hardware geometry, moving masses and wheel friction remain the current model values and require independent calibration.
 
 **Only analyse recordings of ordinary, permitted use. Do not create harder impacts, interact with the moving spring or alter public playground equipment.** A single bounce cannot identify the true end-stop safety performance because the swinging seat, wheels and cable exchange energy. Do not use the app to prescribe safe operating forces.
+
+## Wind tunnel (V5)
+
+The Physics → Wind along cable sliders specify signed wind along the horizontal route:
+positive towards the end-stop and negative towards the launch platform.
+The force is a one-dimensional quadratic relative-air drag law,
+F_air = -D * (v - w) * abs(v - w), D = 0.5 * air_density * Cd * frontal_area
+(kg/m). Wind changes the force on the outbound and return journeys.
+
+The Wind tunnel Compare button reruns the same structure and launch at
+-9, -6, -3, 0, +3, +6 and +9 m/s steady along-cable wind. It reports
+completed spring rebounds, impact speed and whether both trolley and seat
+return to their starting positions. It does not silently clamp manually
+selected launch inputs. Selecting Load wind adjusts the live 3D simulation.
+
+A configurable deterministic sinusoidal gust allows exploratory motion
+experiments but is NOT a weather forecast. Wind comparison disables gusts
+for a controlled comparison. With zero wind, the original simulation
+physics remains unchanged.
+
+Limitations: wind is represented as a *lumped longitudinal force*; it does
+not act as a separate torque on the swinging seat, or include side winds,
+lateral oscillation, deformation, uplift or turbulence. Effective aerodynamic
+drag is not measured, and the actual rider and seat shapes strongly affect
+drag. No outdoor experiment, impact or equipment modification is justified
+by these numerical results.

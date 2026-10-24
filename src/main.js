@@ -5,6 +5,8 @@ import './style.css';
 import { TEMPLATE, SEARCH_BOUNDS } from './optimizer.js';
 import { SCENARIOS, DEMONSTRATION, getScenario, scenarioParams } from './scenarios.js';
 import { attachCalibrationUI } from './calibration-ui.js';
+import { attachWindLab } from './wind-ui.js';
+import { windAtTime, aerodynamicForce } from './physics.js';
 
 const p = {...DEFAULTS};
 let run = makeRun(p), playing = false, playbackRate = 1, tab = 'optimise', showTrail = true;
@@ -32,9 +34,9 @@ app.innerHTML = [
   '</aside><main class="content">',
   '<div class="stageHead"><div><div class="stageTitle">3D experiment chamber</div><div class="stageDesc">Orbit to inspect · Scroll to zoom · Drag on touchscreens</div></div>',
   '<div class="viewActions"><button class="smallButton" id="trailButton">◉ Trail on</button><button class="smallButton" id="cameraButton">⤾ View</button></div></div>',
-  '<div class="viewer" id="viewport"><div class="viewTag">PHOTO-INSPIRED RECONSTRUCTION</div><div class="inset"><small>Simulation time</small><strong id="clock">0.00 s</strong></div>',
+  '<div class="viewer" id="viewport"><div class="viewTag">PHOTO-INSPIRED RECONSTRUCTION</div><div class="inset"><small>Simulation time</small><strong id="clock">0.00 s</strong></div><div class="windBadge" id="windBadge">STILL AIR</div>',
   '<div class="legend"><span><i class="legendDot"></i> Trolley / seat</span><span><i class="legendDot teal"></i> Return trajectory</span></div></div>',
-  '<div class="playback"><div class="playActions"><button class="primary" id="release">▶ Release seat</button><button class="secondary" id="reset">↺ Reset</button><button class="secondary" id="speed">1× speed</button><button class="secondary" id="optimiseTop">✦ Optimise launch</button></div>',
+  '<div class="playback"><div class="playActions"><button class="primary" id="release">▶ Release seat</button><button class="secondary" id="reset">↺ Reset</button><button class="secondary" id="speed">1× speed</button><button class="secondary" id="optimiseTop">✦ Optimise launch</button><button class="secondary windButton" id="windTop">⇄ Compare wind</button></div>',
   '<div class="status"><strong id="status">Ready for release</strong><span id="substatus">Adjust the sliders, then run the simulation.</span></div></div>',
   '<section class="dashboard"><div class="headingLine"><div class="sectionTitle">Live telemetry</div><span class="hint">Model-generated estimates · SI units</span></div>',
   '<div class="metrics">',
@@ -69,7 +71,12 @@ const groups = {
       ['trolleyMass','Trolley / fittings mass',1,15,.5,'kg'],
       ['seatMass','Hanging mass incl. rider',2,90,1,'kg','Includes seat and any rider'],
       ['friction','Wheel resistance coefficient',.002,.12,.002,'','Effective resistance, not a measured value'],
-      ['drag','Quadratic drag factor',0,.3,.005,'kg/m','Opposes trolley travel']
+      ['drag','Effective aerodynamic drag',0,.3,.005,'kg/m','Half air density × drag coefficient × frontal area, relative to moving wind']
+    ]},
+    {title:'Wind along cable',symbol:'⇄',items:[
+      ['windSpeed','Wind towards end (+) or start (−)',-10,10,.5,'m/s','Positive helps outward travel; negative acts towards the start.'],
+      ['windGust','Sinusoidal gust amplitude',0,5,.25,'m/s','Synthetic gust, not real weather. Wind comparison disables gusts.'],
+      ['windPeriod','Synthetic gust period',2,15,.5,'s','Period of the illustrative sinusoidal pattern.']
     ]},
     {title:'Spring end-stop',symbol:'〰',items:[
       ['springLength','Available coil length',.45,1.6,.05,'m'],
@@ -125,7 +132,7 @@ function mountControls(){
       const input=node.querySelector('input');
       input.addEventListener('input',()=>{
         const n=Number(input.value);p[key]=isFraction?n/100:n;
-        cancelOptimization();optimizationResult=null;updateOptimizerOutput();
+        cancelOptimization();optimizationResult=null;updateOptimizerOutput();windUI.cancel();
         node.querySelector('.value').textContent=pretty(n,step)+' '+unit;
         playing=false;run=makeRun(p);frameAccum=0;trailPoints=[];
         buildStatic();updateDynamics(run.state);updateTelemetry();
@@ -138,7 +145,7 @@ function mountControls(){
 mountControls();
 
 document.querySelectorAll('[data-preset]').forEach(b=>b.addEventListener('click',()=>{
-  cancelOptimization();optimizationResult=null;updateOptimizerOutput();
+  cancelOptimization();optimizationResult=null;updateOptimizerOutput();windUI.cancel();
   Object.assign(p,DEFAULTS);
   if(b.dataset.preset==='empty'){p.seatMass=4;p.pushForce=70;}
   if(b.dataset.preset==='rider'){p.seatMass=40;p.pushForce=135;}
@@ -212,7 +219,7 @@ function cancelOptimization(){
   optimizerBusy=false;optimizerProgress='';
 }
 function loadTemplate(){
-  cancelOptimization();
+  cancelOptimization();windUI.cancel();
   Object.assign(p,activeScenarioBase(selectedScenario));
   optimizationResult=null;comparisonResult=null;playing=false;run=makeRun(p);
   frameAccum=0;trailPoints=[];
@@ -252,6 +259,7 @@ function startOptimization(){
 }
 function replayOptimized(){
   if(!optimizationResult?.best)return;
+  windUI.cancel();
   Object.assign(p,activeScenarioBase(optimizationResult.scenarioId),optimizationResult.best.params);
   playing=true;run=makeRun(p);frameAccum=0;trailPoints=[];
   tab='launch';mountControls();buildStatic();updateDynamics(run.state);updateTelemetry();
@@ -259,7 +267,7 @@ function replayOptimized(){
 }
 
 function applyLaunch(scenarioId,settings){
-  cancelOptimization();
+  cancelOptimization();windUI.cancel();
   selectedScenario=scenarioId;
   Object.assign(p,activeScenarioBase(scenarioId),settings);
   playing=true;run=makeRun(p);frameAccum=0;trailPoints=[];
@@ -404,7 +412,7 @@ function updateOptimizerOutput(){
 // only the spring, not the mass, structure, rolling resistance, or force bounds.
 // The worker must receive this same calibrated configuration explicitly.
 function applyObservedFit(fitted,optimize){
-  cancelOptimization();
+  cancelOptimization();windUI.cancel();
   calibratedBase={...p,springK:fitted.stiffness,springDamping:fitted.damping};
   selectedScenario='calibrated';
   Object.assign(p,calibratedBase);
@@ -414,6 +422,17 @@ function applyObservedFit(fitted,optimize){
   mountControls();buildStatic();updateDynamics(run.state);updateTelemetry();updateOptimizerOutput();
   if(optimize)startOptimization();
 }
+const windUI=attachWindLab({
+  getParams:()=>({...p}),
+  onSelectWind:(speed)=>{
+    p.windSpeed=speed;p.windGust=0;
+    playing=false;run=makeRun(p);frameAccum=0;trailPoints=[];
+    mountControls();updateDynamics(run.state);updateTelemetry();
+  }
+});
+document.getElementById('windTop').addEventListener('click',()=>{
+  windUI.open();windUI.compare();
+});
 const calibrationUI=attachCalibrationUI({
   onApply:applyObservedFit,
   getMovingMass:()=>p.trolleyMass+p.seatMass
@@ -460,7 +479,7 @@ const mats={
  trace:new THREE.LineBasicMaterial({color:0x15bfa2,transparent:true,opacity:.82})
 };
 let environment=new THREE.Group();scene.add(environment);
-let trolley,seat,rod,springLine,trailLine,nearMarker;
+let trolley,seat,rod,springLine,trailLine,nearMarker,windArrow;
 function box(parent,material,x,y,z,sx,sy,sz){
  const o=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material);
  o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;parent.add(o);return o;
@@ -563,6 +582,10 @@ function buildStatic(){
  environment.add(springLine);
  trailLine=new THREE.Line(new THREE.BufferGeometry(),mats.trace);
  environment.add(trailLine);trailLine.visible=showTrail;
+ windArrow=new THREE.ArrowHelper(new THREE.Vector3(1,0,0),
+   new THREE.Vector3(L*.50,cableY(L*.50,p)+1.25,0),
+   1.6,0x2184a0,.40,.23);
+ environment.add(windArrow);
  // Move camera proportionally when span changes, keeping orbit controls alive.
  if(!currentScene || Math.abs(currentScene-p.length)>1.5) resetCamera();
  currentScene=p.length;
@@ -578,6 +601,14 @@ document.getElementById('cameraButton').addEventListener('click',resetCamera);
 
 function updateDynamics(st){
  if(!trolley)return;
+ if(windArrow){
+   const windNow=windAtTime(run.time,p);
+   windArrow.visible=Math.abs(windNow)>.07;
+   if(windArrow.visible){
+     windArrow.setDirection(new THREE.Vector3(Math.sign(windNow),0,0));
+     windArrow.setLength(Math.min(3.5,.8+Math.abs(windNow)*.27),.40,.23);
+   }
+ }
  const y=cableY(st.x,p);
  trolley.position.set(st.x,y,0);
  trolley.rotation.z=Math.atan(cableSlope(st.x,p));
@@ -627,6 +658,13 @@ function updateTelemetry(){
  document.getElementById('returnDistance').textContent=run.impactTime===null?'—':fmt(run.returnDistance)+' m';
  document.getElementById('compression').textContent=run.impactTime===null?'—':fmt(run.maxCompression*100,1)+' cm';
  document.getElementById('swing').textContent=fmt(run.maxSwing,1)+'°';
+ const windNow=windAtTime(run.time,p);
+ const airNow=aerodynamicForce(run.state.v,run.time,p);
+ document.getElementById('windBadge').textContent=
+   (Math.abs(windNow)<.05?'STILL AIR':windNow<0?'← TOWARDS START ':'→ TOWARDS STOP ')+
+   (Math.abs(windNow)<.05?'':Math.abs(windNow).toFixed(1)+' m/s')+
+   ' · AIR FORCE '+(airNow>=0?'+':'')+airNow.toFixed(2)+' N';
+ windUI.update();
  document.getElementById('status').textContent=run.finished?'Finished: '+run.phase:(playing?'Simulating: '+run.phase:run.phase==='ready'?'Ready for release':'Paused: '+run.phase);
  document.getElementById('substatus').textContent=run.overtravel?'The assumed spring has exceeded its modelled travel. Results beyond this point are invalid.':
    (run.impactTime!==null?'First contact at '+fmt(run.impactTime)+' s · Spring point '+fmt(stopX(p))+' m · End gap '+fmt(p.endClearance)+' m':

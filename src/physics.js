@@ -5,12 +5,29 @@ export const DEFAULTS = Object.freeze({
   suspension: 1.63, platformHeight: 0.66,
   trolleyMass: 5, seatMass: 14,
   friction: 0.027, drag: 0.035,
+  // Longitudinal wind: positive = towards end-stop, negative = towards start.
+  // m/s, with optional sinusoidal gust for deterministic experiments.
+  windSpeed: 0, windGust: 0, windPeriod: 6,
   springLength: 0.95, endClearance: 2.2, springK: 1450, springDamping: 105,
   startFraction: 0.07, pushForce: 100, pushDuration: 0.30,
   initialSwing: 0, initialSwingRate: 0, swingDamping: 0.32
 });
 const G = 9.81;
 export const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+export function windAtTime(t, p) {
+  const mean = p.windSpeed ?? 0;
+  const gust = p.windGust ?? 0;
+  const period = Math.max(1, p.windPeriod ?? 6);
+  return mean + gust * Math.sin(2*Math.PI*t/period);
+}
+export function aerodynamicForce(v, t, p) {
+  // Effective 1D quadratic drag based on speed RELATIVE TO AIR.
+  // Parameter drag = rho*Cd*A/2, expressed in kg/m. It lumps trolley
+  // and seat drag into one horizontal force and does not model wind
+  // torque or lateral swing of the seat.
+  const rel = v - windAtTime(t,p);
+  return -(p.drag ?? 0) * rel * Math.abs(rel);
+}
 export function cableY(x, p) {
   const q = x / p.length;
   return p.startHeight - p.drop * q - 4 * p.sag * q * (1 - q);
@@ -55,7 +72,7 @@ function derivatives(st, p, time) {
   const det=Math.max(0.001, A*C-B*B);
   const normal=M*G/Math.sqrt(1+slope*slope);
   const rolling=-p.friction*normal*Math.tanh(v/0.12);
-  const air=-p.drag*v*Math.abs(v);
+  const air=aerodynamicForce(v,time,p);
   const compression=Math.max(0,x-stopX(p));
   // The spring can push, not pull. Damping acts only while in contact.
   const springForce=compression>0 ? Math.min(0,-p.springK*compression-p.springDamping*v) : 0;

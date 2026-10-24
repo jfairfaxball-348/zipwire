@@ -128,3 +128,34 @@ input[type=range]::-webkit-slider-thumb{appearance:none;width:16px;height:16px;b
 .frameHelper p{font-size:11px;line-height:1.6;color:#91b4bc}
 .frameFields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px}
 @media(max-width:690px){.calibrationBody{padding:13px}.calibrationFields{grid-template-columns:1fr}.calibrationPanel .optimizerHeading small{max-width:108px;text-align:right}}
+
+/* Longitudinal wind laboratory */
+.windBadge{position:absolute;right:12px;bottom:13px;max-width:45%;pointer-events:none;
+ padding:8px 10px;border-radius:8px;border:1px solid #416876;
+ background:#0f3542dd;color:#a9e8f0;font-size:10px;font-weight:700;line-height:1.5;
+ text-align:right;letter-spacing:.2px}
+.windButton{border:1px solid #327f9b;color:#a9e9f0;background:#173645}
+.windLab{margin-top:16px;border:1px solid #32556a;border-radius:13px;background:#112838;overflow:hidden;scroll-margin-top:16px}
+.windLab .optimizerHeading{color:#9ee6ee}
+.windBody{padding:16px}
+.windBody>p{font-size:12px;color:#b0cad2;line-height:1.7;margin:0 0 15px}
+.windOverview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.windOverview>div{border:1px solid #365969;padding:12px;border-radius:10px;background:#0d2230}
+.windOverview small{font-size:10px;color:#84a4b4;display:block;margin-bottom:6px}
+.windOverview strong{color:#99e7e8;font:700 14px 'Space Grotesk',sans-serif}
+.windResults{padding:10px 0;font-size:12px;color:#aac7d0}
+.windResults>p{line-height:1.6}
+.windComparisonHeader{display:flex;justify-content:space-between;gap:10px;margin:8px 0 14px;font-size:12px}
+.windComparisonHeader span{color:#82aab6;font-size:10px}
+.windCaseList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.windCase{border:1px solid #325566;padding:12px;border-radius:10px;background:#0c2533}
+.windCaseTop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.windCaseTop strong{font-size:12px;color:#d4f0f0}
+.windCaseTop span{color:#86a7b3;font-size:10px;text-align:right}
+.windCaseTrack{width:100%;height:6px;background:#284556;border-radius:99px;overflow:hidden;margin:12px 0}
+.windCaseTrack>div{height:100%;background:#65d9b7;border-radius:99px}
+.windCaseFoot{display:flex;justify-content:space-between;align-items:center;gap:8px;color:#99b5c0;font-size:10px}
+.windCaseFoot button{white-space:nowrap}
+.windCaseFoot .windSuccess{color:#8ff2c2;font-weight:700}
+@media(max-width:790px){.windCaseList{grid-template-columns:1fr}.windOverview{grid-template-columns:1fr 1fr}}
+@media(max-width:690px){.windBody{padding:12px}.windOverview{grid-template-columns:1fr 1fr}.windBadge{font-size:9px}.windComparisonHeader{flex-direction:column}}
