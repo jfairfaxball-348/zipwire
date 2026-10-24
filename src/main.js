@@ -6,6 +6,7 @@ import { TEMPLATE, SEARCH_BOUNDS } from './optimizer.js';
 import { SCENARIOS, DEMONSTRATION, getScenario, scenarioParams } from './scenarios.js';
 import { attachCalibrationUI } from './calibration-ui.js';
 import { attachWindLab } from './wind-ui.js';
+import { attachMinimumPushUI } from './min-push-ui.js';
 import { windAtTime, aerodynamicForce } from './physics.js';
 
 const p = {...DEFAULTS};
@@ -132,7 +133,7 @@ function mountControls(){
       const input=node.querySelector('input');
       input.addEventListener('input',()=>{
         const n=Number(input.value);p[key]=isFraction?n/100:n;
-        cancelOptimization();optimizationResult=null;updateOptimizerOutput();windUI.cancel();
+        cancelOptimization();optimizationResult=null;updateOptimizerOutput();windUI.cancel();minimumPushUI.invalidate();
         node.querySelector('.value').textContent=pretty(n,step)+' '+unit;
         playing=false;run=makeRun(p);frameAccum=0;trailPoints=[];
         buildStatic();updateDynamics(run.state);updateTelemetry();
@@ -145,7 +146,7 @@ function mountControls(){
 mountControls();
 
 document.querySelectorAll('[data-preset]').forEach(b=>b.addEventListener('click',()=>{
-  cancelOptimization();optimizationResult=null;updateOptimizerOutput();windUI.cancel();
+  cancelOptimization();optimizationResult=null;updateOptimizerOutput();windUI.cancel();minimumPushUI.invalidate();
   Object.assign(p,DEFAULTS);
   if(b.dataset.preset==='empty'){p.seatMass=4;p.pushForce=70;}
   if(b.dataset.preset==='rider'){p.seatMass=40;p.pushForce=135;}
@@ -155,6 +156,7 @@ document.querySelectorAll('[data-preset]').forEach(b=>b.addEventListener('click'
 }));
 const release=document.getElementById('release');
 release.addEventListener('click',()=>{
+  minimumPushUI.invalidate();
   if(run.finished || run.phase==='ready') {
     run=makeRun(p);trailPoints=[];frameAccum=0;
   }
@@ -163,7 +165,7 @@ release.addEventListener('click',()=>{
   updateTelemetry();
 });
 document.getElementById('reset').addEventListener('click',()=>{
-  playing=false;run=makeRun(p);trailPoints=[];frameAccum=0;
+  minimumPushUI.invalidate();playing=false;run=makeRun(p);trailPoints=[];frameAccum=0;
   updateDynamics(run.state);updateTelemetry();
 });
 document.getElementById('speed').addEventListener('click',e=>{
@@ -219,7 +221,7 @@ function cancelOptimization(){
   optimizerBusy=false;optimizerProgress='';
 }
 function loadTemplate(){
-  cancelOptimization();windUI.cancel();
+  cancelOptimization();windUI.cancel();minimumPushUI.invalidate();
   Object.assign(p,activeScenarioBase(selectedScenario));
   optimizationResult=null;comparisonResult=null;playing=false;run=makeRun(p);
   frameAccum=0;trailPoints=[];
@@ -259,7 +261,7 @@ function startOptimization(){
 }
 function replayOptimized(){
   if(!optimizationResult?.best)return;
-  windUI.cancel();
+  windUI.cancel();minimumPushUI.invalidate();
   Object.assign(p,activeScenarioBase(optimizationResult.scenarioId),optimizationResult.best.params);
   playing=true;run=makeRun(p);frameAccum=0;trailPoints=[];
   tab='launch';mountControls();buildStatic();updateDynamics(run.state);updateTelemetry();
@@ -267,7 +269,7 @@ function replayOptimized(){
 }
 
 function applyLaunch(scenarioId,settings){
-  cancelOptimization();windUI.cancel();
+  cancelOptimization();windUI.cancel();minimumPushUI.invalidate();
   selectedScenario=scenarioId;
   Object.assign(p,activeScenarioBase(scenarioId),settings);
   playing=true;run=makeRun(p);frameAccum=0;trailPoints=[];
@@ -412,7 +414,7 @@ function updateOptimizerOutput(){
 // only the spring, not the mass, structure, rolling resistance, or force bounds.
 // The worker must receive this same calibrated configuration explicitly.
 function applyObservedFit(fitted,optimize){
-  cancelOptimization();windUI.cancel();
+  cancelOptimization();windUI.cancel();minimumPushUI.invalidate();
   calibratedBase={...p,springK:fitted.stiffness,springDamping:fitted.damping};
   selectedScenario='calibrated';
   Object.assign(p,calibratedBase);
@@ -425,7 +427,7 @@ function applyObservedFit(fitted,optimize){
 const windUI=attachWindLab({
   getParams:()=>({...p}),
   onSelectWind:(speed)=>{
-    p.windSpeed=speed;p.windGust=0;
+    minimumPushUI.invalidate();p.windSpeed=speed;p.windGust=0;
     playing=false;run=makeRun(p);frameAccum=0;trailPoints=[];
     mountControls();updateDynamics(run.state);updateTelemetry();
   }
@@ -436,6 +438,35 @@ document.getElementById('windTop').addEventListener('click',()=>{
 const calibrationUI=attachCalibrationUI({
   onApply:applyObservedFit,
   getMovingMass:()=>p.trolleyMass+p.seatMass
+});
+
+
+const minimumPushUI=attachMinimumPushUI({
+  getParams:()=>({...p}),
+  onSearchStart:()=>{
+    cancelOptimization();windUI.cancel();
+    playing=false;
+    updateTelemetry();
+  },
+  onLaunch:(settings)=>{
+    // Keep every mechanical and wind parameter EXACTLY as it was when
+    // the minimum-force search began, changing only the launch inputs.
+    Object.assign(p,settings);
+    playing=true;run=makeRun(p);frameAccum=0;trailPoints=[];
+    tab='launch';mountControls();
+    updateDynamics(run.state);updateTelemetry();
+    document.getElementById('viewport').scrollIntoView({block:'nearest',behavior:'smooth'});
+  },
+  onLoadDemo:()=>{
+    cancelOptimization();windUI.cancel();
+    selectedScenario='efficient';
+    Object.assign(p,scenarioParams('efficient'),{
+      startFraction:.07,windSpeed:0,windGust:0,initialSwingRate:0
+    });
+    playing=false;run=makeRun(p);frameAccum=0;trailPoints=[];
+    tab='launch';mountControls();buildStatic();
+    updateDynamics(run.state);updateTelemetry();
+  }
 });
 
 document.getElementById('optimiseTop').addEventListener('click',()=>{tab='optimise';startComparison();});

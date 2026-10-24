@@ -86,3 +86,35 @@ lateral oscillation, deformation, uplift or turbulence. Effective aerodynamic
 drag is not measured, and the actual rider and seat shapes strongly affect
 drag. No outdoor experiment, impact or equipment modification is justified
 by these numerical results.
+
+
+## One-tap minimum-force return (V6)
+
+Click the green button labelled with the actual finite-grid equation:
+F* ≈ min { F : x_t,return <= x_t,start AND x_s,return <= x_s,start }.
+
+The button preserves the CURRENT 3D apparatus (span, cable geometry,
+friction, suspension, seat/trolley masses, end-stop and wind) and FIXES the
+current trolley starting position. It tests positive constant-force pushes
+from 0 through 110 N in 5 N steps, with durations 0.20–0.45 s and initial
+seat angles of 0, ±2, ±4 and ±6 degrees. Initial swing angular speed is
+set to zero. For the first successful coarse force, it checks every 1 N
+increment in the preceding 5 N band. Feasibility requires the trolley
+*and* seat centre to return to their starting coordinates after a completed
+spring bounce, plus the existing model validity checks. A worker performs
+the computations while the renderer remains responsive.
+
+Upon success, the app immediately applies the resulting force, duration
+and initial swing and starts the 3D release animation. On failure, it
+reports that NO admissible push was found in the TESTED range, with no
+fabricated optimal force or implicit switch to another geometry. The
+secondary control intentionally loads the separate, hypothetical 15 m
+nearly-level/elastic-stop example and runs the same minimisation.
+
+This is a BOUNDED SAMPLED approximation; it does not prove a global
+optimum, robust threshold or safe real-world pushing force. Feasibility
+may be highly non-monotone between sampled forces because pendulum phase
+and spring rebound are coupled. Also, minimizing average applied force
+with variable duration is not identical to minimizing energy or impulse.
+Manufacturer-specified limits and calibrated observations are required
+before any real-world safety interpretation.

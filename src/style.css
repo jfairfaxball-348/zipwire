@@ -159,3 +159,27 @@ input[type=range]::-webkit-slider-thumb{appearance:none;width:16px;height:16px;b
 .windCaseFoot .windSuccess{color:#8ff2c2;font-weight:700}
 @media(max-width:790px){.windCaseList{grid-template-columns:1fr}.windOverview{grid-template-columns:1fr 1fr}}
 @media(max-width:690px){.windBody{padding:12px}.windOverview{grid-template-columns:1fr 1fr}.windBadge{font-size:9px}.windComparisonHeader{flex-direction:column}}
+
+/* One-tap minimum-force return, permanently visible beneath transport */
+.minimumPushPanel{margin:13px 20px 2px;padding:15px;border:1px solid #427568;
+  border-radius:14px;background:linear-gradient(133deg,#153b37,#172f37);
+  box-shadow:0 8px 24px #06151d50}
+.minPushTop strong{font:700 16px 'Space Grotesk',sans-serif;color:#acf2d5}
+.minPushTop p{font-size:11px;color:#b3d3cb;line-height:1.6;margin:7px 0 13px}
+.minPushButton{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  width:100%;gap:7px;text-align:center;background:#5bdab4;color:#082820;border:0;border-radius:11px;
+  padding:15px 12px;box-shadow:0 7px 19px #2bddaa25}
+.minPushButton:hover{background:#87f1d0}
+.minPushButton:disabled{opacity:.62;cursor:wait}
+.minPushMath{font:700 clamp(11px,1.5vw,15px) 'Space Grotesk',sans-serif;line-height:1.5;overflow-wrap:anywhere}
+.minPushButtonAction{font:800 clamp(13px,1.8vw,17px) 'Space Grotesk',sans-serif}
+.minPushStatus{margin-top:12px;color:#baded3;font-size:12px;line-height:1.55;min-height:30px}
+.minPushStatus b{color:#94f3cb}
+.minPushActions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.minPushActions .secondary{font-size:11px}
+.minPushDisclaimer{color:#87aca8!important;font-size:10px!important;line-height:1.55!important;margin:10px 0 0!important}
+.minPushSearching{border-color:#79d5b8}
+@media(max-width:690px){.minimumPushPanel{margin:12px 10px 2px;padding:13px}
+  .minPushMath{font-size:12px}.minPushButtonAction{font-size:14px}
+  .minPushActions .secondary{flex:1}
+}
