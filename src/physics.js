@@ -5,7 +5,7 @@ export const DEFAULTS = Object.freeze({
   suspension: 1.63, platformHeight: 0.66,
   trolleyMass: 5, seatMass: 14,
   friction: 0.027, drag: 0.035,
-  springLength: 0.95, springK: 1450, springDamping: 105,
+  springLength: 0.95, endClearance: 2.2, springK: 1450, springDamping: 105,
   startFraction: 0.07, pushForce: 100, pushDuration: 0.30,
   initialSwing: 0, initialSwingRate: 0, swingDamping: 0.32
 });
@@ -22,7 +22,8 @@ export function cableCurvature(p) {
   return 8 * p.sag / (p.length*p.length);
 }
 export function stopX(p) {
-  return p.length - 0.32 - p.springLength;
+  // The back of the spring/stop sits before the far support; the wire continues beyond it.
+  return p.length - p.endClearance - p.springLength;
 }
 export function initialX(p) {
   return clamp(p.startFraction, 0.01, 0.89) * stopX(p);

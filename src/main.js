@@ -49,7 +49,8 @@ const groups = {
       ['drop','End-to-end drop',-0.8,1.8,.05,'m','Positive means the end is lower'],
       ['sag','Midspan cable sag',0,1.1,.02,'m','Prescribed bow below the straight chord'],
       ['suspension','Seat suspension length',.75,2.5,.05,'m'],
-      ['platformHeight','Start platform height',.25,1.5,.05,'m']
+      ['platformHeight','Start platform height',.25,1.5,.05,'m'],
+      ['endClearance','Stop-to-end-support gap',.3,3.5,.1,'m','Clear cable distance beyond the spring end block']
     ]},
     {title:'Position on wire',symbol:'◎',items:[
       ['startFraction','Starting position',2,75,1,'%','Share of the route before spring contact']
@@ -64,6 +65,7 @@ const groups = {
     ]},
     {title:'Spring end-stop',symbol:'〰',items:[
       ['springLength','Available coil length',.45,1.6,.05,'m'],
+      ['endClearance','End support clearance',.3,3.5,.1,'m','Distance from the rear block of the spring to the end A-frame'],
       ['springK','Spring stiffness',200,6500,50,'N/m'],
       ['springDamping','Spring damping',0,800,10,'Ns/m','Energy lost during compression and rebound']
     ]},
@@ -235,16 +237,26 @@ function buildStatic(){
    rodBetween(environment,[x-.5,y-.23,-.43],[x+.4,y-.23,.43],.07,mats.steel);
    box(environment,mats.dark,x,y,0,.30,.20,.24);
  });
- // Starting launch platform and sloped ramp.
- box(environment,mats.platform,-1.35,p.platformHeight,0,2,.11,1.35);
- const ramp=box(environment,mats.platform,-3,p.platformHeight*.53,0,1.72,.09,1.33);
- ramp.rotation.z=Math.atan2(p.platformHeight,1.72);
- [-2.4,-1.9,-1.4].forEach(x=>box(environment,mats.steel,x,p.platformHeight*.8,.58,.05,.72,.05));
- [-2.15,-.72].forEach(x=>{
+ // The real access platform and descending ramp sit INSIDE the span, on
+ // the travel-direction side of the starting A-frame, not behind it.
+ // A visitor walks up the ramp toward the left to reach the raised platform.
+ const platformLeft=0.12, platformRight=2.12;
+ const platformCentre=(platformLeft+platformRight)/2;
+ box(environment,mats.platform,platformCentre,p.platformHeight,0,platformRight-platformLeft,.11,1.35);
+ const rampRun=2.7, rampAngle=Math.atan2(p.platformHeight,rampRun);
+ const ramp=box(environment,mats.platform,platformRight+rampRun/2,p.platformHeight/2,0,Math.hypot(rampRun,p.platformHeight),.09,1.33);
+ ramp.rotation.z=-rampAngle;
+ // Short anti-slip transverse ribs follow the incline down to the ground.
+ for(let i=1;i<=8;i++){
+   const f=i/9, x=platformRight+f*rampRun, y=p.platformHeight*(1-f)+.055;
+   box(environment,mats.steel,x,y,0,.048,.025,1.28);
+ }
+ [platformLeft+.15,platformRight-.18].forEach(x=>{
    rodBetween(environment,[x,0,-.63],[x,p.platformHeight+.68,-.63],.038,mats.dark);
    rodBetween(environment,[x,0,.63],[x,p.platformHeight+.68,.63],.038,mats.dark);
  });
- rodBetween(environment,[-2.15,p.platformHeight+.68,-.63],[-.72,p.platformHeight+.68,-.63],.035,mats.dark);
+ rodBetween(environment,[platformLeft+.15,p.platformHeight+.68,-.63],[platformRight-.18,p.platformHeight+.68,-.63],.035,mats.dark);
+ rodBetween(environment,[platformLeft+.15,p.platformHeight+.68,.63],[platformRight-.18,p.platformHeight+.68,.63],.035,mats.dark);
  // Distinctive red fence behind the installation.
  for(let x=-5;x<=L+5;x+=.37) box(environment,mats.red,x,.74,-4,.075,1.28,.07);
  rodBetween(environment,[-5,.47,-4],[L+5,.47,-4],.035,mats.red);
@@ -257,8 +269,11 @@ function buildStatic(){
    rodBetween(environment,[x,0,z],[x,height,z],.15,mats.tree,7);
    for(let j=0;j<3;j++)ball(environment,mats.foliage,x+Math.sin(i*8+j)*1.1,height+.6+(j%2)*.65,z+Math.cos(i*3+j)*.45,1.24+(j%2)*.23);
  }
- // Solid cable termination and stopper behind coil.
- box(environment,mats.dark,L-.23,cableY(L,p),0,.22,.37,.32);
+ // Spring/stop assembly sits BEFORE the far A-frame. The uninterrupted
+ // cable from springBackX to L is visibly exposed, as in the photographs.
+ const springBackX=L-p.endClearance;
+ box(environment,mats.dark,L-.18,cableY(L,p),0,.22,.37,.32);
+ box(environment,mats.rubber,springBackX,cableY(springBackX,p),0,.28,.47,.43);
  nearMarker=box(environment,mats.rubber,stopX(p),cableY(stopX(p),p),0,.22,.35,.34);
  // trolley and suspended equipment
  trolley=new THREE.Group();
@@ -300,7 +315,7 @@ function updateDynamics(st){
  seat.position.set(pos[0],pos[1],pos[2]);
  moveSegment(rod,[st.x,y-.19,0],[pos[0],pos[1]+.1,0]);
  const contact=stopX(p),comp=Math.max(0,st.x-contact);
- const coilStart=contact+comp,coilEnd=p.length-.34;
+ const coilStart=contact+comp,coilEnd=p.length-p.endClearance;
  const points=[];
  for(let i=0;i<=100;i++){
    const f=i/100;
@@ -344,8 +359,8 @@ function updateTelemetry(){
  document.getElementById('swing').textContent=fmt(run.maxSwing,1)+'°';
  document.getElementById('status').textContent=run.finished?'Finished: '+run.phase:(playing?'Simulating: '+run.phase:run.phase==='ready'?'Ready for release':'Paused: '+run.phase);
  document.getElementById('substatus').textContent=run.overtravel?'The assumed spring has exceeded its modelled travel. Results beyond this point are invalid.':
-   (run.impactTime!==null?'First contact at '+fmt(run.impactTime)+' s · Spring point '+fmt(stopX(p))+' m':
-   'Release height '+fmt(cableY(run.state.x,p))+' m · Spring point '+fmt(stopX(p))+' m');
+   (run.impactTime!==null?'First contact at '+fmt(run.impactTime)+' s · Spring point '+fmt(stopX(p))+' m · End gap '+fmt(p.endClearance)+' m':
+   'Release height '+fmt(cableY(run.state.x,p))+' m · Spring point '+fmt(stopX(p))+' m · End gap '+fmt(p.endClearance)+' m');
  release.textContent=playing?'Ⅱ Pause':run.finished||run.phase==='ready'?'▶ Release seat':'▶ Resume';
  const E=energy(run.state,p);
  document.getElementById('energyText').textContent='Current kinetic energy: '+fmt(Math.max(0,E.kinetic),1)+' J · Spring energy: '+fmt(E.spring,1)+' J.';
