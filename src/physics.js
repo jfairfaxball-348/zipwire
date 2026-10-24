@@ -131,7 +131,7 @@ export function stepRun(run,p,dt=1/240) {
   }
   if(run.time>20) {run.finished=true;run.phase='time limit';}
   run.sampleClock+=dt;
-  if(run.sampleClock>=0.045 || run.samples.length===0) {
+  if(run.recordSamples!==false && (run.sampleClock>=0.045 || run.samples.length===0)) {
     run.sampleClock=0;
     run.samples.push({t:run.time,x:next.x,v:next.v,phi:next.phi*180/Math.PI,comp:compression});
   }
