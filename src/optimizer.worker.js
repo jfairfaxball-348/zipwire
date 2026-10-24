@@ -1,14 +1,16 @@
 import { TEMPLATE, SEARCH_BOUNDS, LAUNCH_KEYS, evaluateLaunch, proposedLaunch, nearForceLimit } from './optimizer.js';
+import { SCENARIOS, scenarioParams } from './scenarios.js';
 
 let active = 0;
 const chunk = () => new Promise(resolve=>setTimeout(resolve,0));
-async function search(id) {
-  const base = {...TEMPLATE};
+async function search(id,scenarioId='reference') {
+  const base=scenarioParams(scenarioId);
   const candidates = [
     Object.fromEntries(LAUNCH_KEYS.map(k=>[k,base[k]])),
     ...Array.from({length:240},(_,i)=>proposedLaunch(i+1)),
     // Include physically intuitive no-swing cases, to compare against phase-tuned launches.
-    ...[0,35,70,105,150].map(force=>({...base,pushForce:force,initialSwing:0,initialSwingRate:0}))
+    ...[0,35,55,65,70,80,95,110].map(force=>({...base,pushForce:force,initialSwing:0,initialSwingRate:0})),
+    ...[60,65,70,75,80,85,90,95].flatMap(force=>[0,4].map(angle=>({...base,startFraction:.07,pushForce:force,pushDuration:.4,initialSwing:angle,initialSwingRate:0})))
   ];
   let count=0, feasible=0, best=null;
   async function tryOne(params,totalHint) {
@@ -70,14 +72,54 @@ async function search(id) {
     nearForceLimit:nearForceLimit(best),
     nearSwingLimit:Boolean(best && best.maxSwing>=49),
     nearStartLimit:Boolean(best && best.params.startFraction>=SEARCH_BOUNDS.startFraction[1]-.005),
-    interiorSweepPeak,base
+    interiorSweepPeak,base,scenarioId
   });
+}
+// Hold the launch point fixed and start with zero angular speed. A four-degree
+// tilt is a small controlled initial condition, not injected angular kinetic
+// energy. We prefer both seat and trolley coming back to their starting points.
+async function compare(id){
+  const results=[];
+  const forces=[35,45,55,60,65,70,75,80,85,90,95,100,110];
+  const durations=[.2,.25,.3,.35,.4,.45];
+  for(const config of SCENARIOS){
+    if(id!==active)return;
+    const base=scenarioParams(config.id);
+    let best=null, bestHome=null, bestBoth=null, admissible=0, trials=0;
+    for(const force of forces){
+      for(const duration of durations){
+        for(const angle of [0,4]){
+          if(id!==active)return;
+          const r=evaluateLaunch(base,{
+            startFraction:.07,pushForce:force,pushDuration:duration,
+            initialSwing:angle,initialSwingRate:0
+          });
+          trials++;
+          if(r.valid){
+            admissible++;
+            if(!best||r.returnFraction>best.returnFraction)best=r;
+            if(r.trolleyReturned && (!bestHome||force<bestHome.params.pushForce ||
+              (force===bestHome.params.pushForce&&duration<bestHome.params.pushDuration)))bestHome=r;
+            if(r.trolleyReturned&&r.seatReturned &&
+              (!bestBoth||force<bestBoth.params.pushForce||
+               (force===bestBoth.params.pushForce&&duration<bestBoth.params.pushDuration)))bestBoth=r;
+          }
+        }
+      }
+      await chunk();
+    }
+    results.push({scenarioId:config.id,name:config.name,description:config.description,
+      trials,admissible,best,bestHome,bestBoth,
+      selected:bestBoth||bestHome||best});
+    postMessage({type:'compare-progress',id,done:results.length,total:SCENARIOS.length});
+  }
+  postMessage({type:'compare-done',id,results});
 }
 onmessage=e=>{
   if(e.data?.type==='cancel'){active++;return;}
-  if(e.data?.type==='search'){
-    const id=e.data.id;
-    active=id;
-    search(id).catch(error=>postMessage({type:'error',id,message:String(error?.message||error)}));
+  if(e.data?.type==='search'||e.data?.type==='compare'){
+    const id=e.data.id; active=id;
+    const task=e.data.type==='search'?search(id,e.data.scenarioId):compare(id);
+    task.catch(error=>postMessage({type:'error',id,message:String(error?.message||error)}));
   }
 };

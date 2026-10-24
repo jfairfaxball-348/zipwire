@@ -44,3 +44,8 @@ test('force boundary is not misreported as an interior optimum',()=>{
   assert.ok(nearForceLimit({params:{pushForce:150}}));
   assert.equal(nearForceLimit({params:{pushForce:90}}),false);
 });
+
+test('moderate search bounds remain fixed for this experiment',()=>{
+  assert.equal(SEARCH_BOUNDS.pushForce[1],110);
+  assert.equal(SEARCH_BOUNDS.startFraction[1],.10);
+});

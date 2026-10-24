@@ -17,11 +17,12 @@ export const TEMPLATE = Object.freeze({
   initialSwingRate: 0
 });
 export const SEARCH_BOUNDS = Object.freeze({
-  startFraction: [0.04, 0.20],
-  pushForce: [0, 150],
-  pushDuration: [0.15, 0.55],
-  initialSwing: [-12, 12],
-  initialSwingRate: [-35, 35]
+  // Bounds for model experiments, not approved operating forces.
+  startFraction: [0.05, 0.10],
+  pushForce: [0, 110],
+  pushDuration: [0.15, 0.45],
+  initialSwing: [-6, 6],
+  initialSwingRate: [-20, 20]
 });
 export const LAUNCH_KEYS = Object.freeze(Object.keys(SEARCH_BOUNDS));
 const DT = 1/240, MAX_TIME = 20;

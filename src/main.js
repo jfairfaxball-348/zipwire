@@ -3,10 +3,11 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { DEFAULTS, cableY, cableSlope, stopX, initialState, makeRun, stepRun, energy, clamp } from './physics.js';
 import './style.css';
 import { TEMPLATE, SEARCH_BOUNDS } from './optimizer.js';
+import { SCENARIOS, DEMONSTRATION, getScenario, scenarioParams } from './scenarios.js';
 
 const p = {...DEFAULTS};
 let run = makeRun(p), playing = false, playbackRate = 1, tab = 'optimise', showTrail = true;
-let optimizerWorker=null, optimizerJobId=0, optimizerBusy=false, optimizationResult=null, optimizerProgress='';
+let optimizerWorker=null, optimizerJobId=0, optimizerBusy=false, optimizationResult=null, comparisonResult=null, selectedScenario='efficient', optimizerProgress='';
 let currentScene = null, lastFrame = performance.now(), frameAccum = 0, trailPoints = [];
 const app = document.getElementById('app');
 
@@ -162,24 +163,38 @@ document.getElementById('trailButton').addEventListener('click',e=>{
 // Separate worker computes an actual bounded search over the same physics
 // integrator; do not confuse the selected candidate with a certified optimum.
 function renderOptimizerControls(node){
-  node.innerHTML='<div class="optimiserSidebar"><div class="groupTitle"><i>✦</i> Reference launch</div>'+
-    '<p class="muted">Fix the apparatus at illustrative values, then vary only how the trolley and seat start moving.</p>'+
-    '<div class="fixedList"><strong>Fixed template (estimates)</strong>'+
-    '<div><span>Cable span</span><b>'+TEMPLATE.length+' m</b></div>'+
-    '<div><span>Total moving mass</span><b>'+(TEMPLATE.trolleyMass+TEMPLATE.seatMass)+' kg</b></div>'+
-    '<div><span>Spring stiffness</span><b>'+TEMPLATE.springK+' N/m</b></div>'+
-    '<div><span>Spring damping</span><b>'+TEMPLATE.springDamping+' Ns/m</b></div>'+
-    '<div><span>Midspan sag</span><b>'+TEMPLATE.sag+' m</b></div></div>'+
-    '<button class="secondary optFull" id="optLoad">↺ Reset to template</button>'+
-    '<button class="primary optFull" id="optRun" '+(optimizerBusy?'disabled':'')+'>✦ '+(optimizerBusy?'Searching…':'Find best tested return')+'</button>'+
-    '<button class="secondary optFull '+(optimizerBusy?'':'hidden')+'" id="optCancel">Cancel</button>'+
-    '<div id="optStatus" class="optimiserStatus" aria-live="polite">'+(optimizerProgress||'Ready for mathematical search.')+'</div>'+
-    '<div class="searchBounds"><strong>Search dimensions</strong><div>Push force: 0–150 N</div>'+
-    '<div>Push duration: 0.15–0.55 s</div><div>Starting position: 4–20% of span to spring</div>'+
-    '<div>Initial swing: −12° to +12°</div><div>Initial angular speed: −35°/s to +35°/s</div></div>'+
-    '<p class="foot">The search ranges are arbitrary analytical bounds, not safe real-world push settings. Spring limits and mass are not measured.</p></div>';
+  const chosen=getScenario(selectedScenario),base=scenarioParams(selectedScenario);
+  node.innerHTML='<div class="optimiserSidebar"><div class="groupTitle"><i>✦</i> Hardware scenarios</div>'+
+    '<p class="muted">Compare hypothetical equipment changes, then optimise only the launch. None are measurements of the playground.</p>'+
+    '<label class="scenarioLabel" for="scenarioChoice">Choose model configuration</label>'+
+    '<select class="scenarioSelect" id="scenarioChoice">'+SCENARIOS.map(c=>
+      '<option value="'+c.id+'" '+(c.id===selectedScenario?'selected':'')+'>'+c.name+'</option>'
+    ).join('')+'</select>'+
+    '<p class="scenarioDescription">'+chosen.description+'</p>'+
+    '<div class="fixedList"><strong>Fixed for this launch search</strong>'+
+    '<div><span>Span / net drop</span><b>'+base.length.toFixed(1)+' m / '+base.drop.toFixed(2)+' m</b></div>'+
+    '<div><span>Moving mass</span><b>'+(base.trolleyMass+base.seatMass)+' kg</b></div>'+
+    '<div><span>Effective rolling coefficient</span><b>'+base.friction.toFixed(3)+'</b></div>'+
+    '<div><span>Spring stiffness</span><b>'+base.springK+' N/m</b></div>'+
+    '<div><span>Spring damping</span><b>'+base.springDamping+' Ns/m</b></div></div>'+
+    '<button class="secondary optFull" id="optLoad">↺ Load selected scenario</button>'+
+    '<button class="primary optFull" id="optCompare" '+(optimizerBusy?'disabled':'')+'>◈ Compare all five setups</button>'+
+    '<button class="secondary optFull" id="optRun" '+(optimizerBusy?'disabled':'')+'>✦ Optimise selected setup</button>'+
+    '<button class="secondary optFull '+(optimizerBusy?'':'hidden')+'" id="optCancel">Cancel calculation</button>'+
+    '<div id="optStatus" class="optimiserStatus" aria-live="polite">'+(optimizerProgress||'Search can evaluate complete rebounds with one tap.')+'</div>'+
+    '<div class="searchBounds"><strong>Launch inputs explored</strong>'+
+    '<div>Push force ≤ 110 N (model bound)</div>'+
+    '<div>Push duration 0.15–0.45 s</div>'+
+    '<div>Starting position 5–10% of route</div>'+
+    '<div>Seat swing ±6°, angular rate ±20°/s</div>'+
+    '<div>For scenario comparison: start 7%, initial swing rate 0°/s, swing angle 0° or +4°</div></div>'+
+    '<p class="foot">No value in this screen is a real playground operating limit. Spring efficiency, cable loads and component safety are unverified.</p></div>';
+  node.querySelector('#scenarioChoice').addEventListener('change',e=>{
+    selectedScenario=e.target.value;loadTemplate();
+  });
   node.querySelector('#optLoad').addEventListener('click',loadTemplate);
   node.querySelector('#optRun').addEventListener('click',startOptimization);
+  node.querySelector('#optCompare').addEventListener('click',startComparison);
   node.querySelector('#optCancel').addEventListener('click',cancelOptimization);
 }
 function cancelOptimization(){
@@ -189,14 +204,14 @@ function cancelOptimization(){
 }
 function loadTemplate(){
   cancelOptimization();
-  Object.assign(p,TEMPLATE);
-  optimizationResult=null;playing=false;run=makeRun(p);
+  Object.assign(p,scenarioParams(selectedScenario));
+  optimizationResult=null;comparisonResult=null;playing=false;run=makeRun(p);
   frameAccum=0;trailPoints=[];
   mountControls();buildStatic();updateDynamics(run.state);updateTelemetry();updateOptimizerOutput();
 }
 function startOptimization(){
   loadTemplate();
-  optimizerBusy=true;optimizerProgress='Evaluating simulated launches…';
+  optimizerBusy=true;optimizerProgress='Evaluating '+getScenario(selectedScenario).name+'…';
   mountControls();updateOptimizerOutput();
   const id=++optimizerJobId;
   const worker=new Worker(new URL('./optimizer.worker.js',import.meta.url),{type:'module'});
@@ -224,15 +239,84 @@ function startOptimization(){
     if(optimizerWorker)optimizerWorker.terminate();
     optimizerWorker=null;mountControls();updateOptimizerOutput();
   };
-  worker.postMessage({type:'search',id});
+  worker.postMessage({type:'search',id,scenarioId:selectedScenario});
 }
 function replayOptimized(){
   if(!optimizationResult?.best)return;
-  Object.assign(p,TEMPLATE,optimizationResult.best.params);
+  Object.assign(p,scenarioParams(optimizationResult.scenarioId),optimizationResult.best.params);
   playing=true;run=makeRun(p);frameAccum=0;trailPoints=[];
   tab='launch';mountControls();buildStatic();updateDynamics(run.state);updateTelemetry();
   document.getElementById('viewport').scrollIntoView({block:'nearest',behavior:'smooth'});
 }
+
+function applyLaunch(scenarioId,settings){
+  cancelOptimization();
+  selectedScenario=scenarioId;
+  Object.assign(p,scenarioParams(scenarioId),settings);
+  playing=true;run=makeRun(p);frameAccum=0;trailPoints=[];
+  tab='launch';mountControls();buildStatic();updateDynamics(run.state);updateTelemetry();
+  document.getElementById('viewport').scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+function startComparison(){
+  cancelOptimization();
+  comparisonResult=null;optimizationResult=null;
+  optimizerBusy=true;optimizerProgress='Comparing five physical scenarios under the same launch search limits…';
+  tab='optimise';mountControls();updateOptimizerOutput();
+  const id=++optimizerJobId;
+  const worker=new Worker(new URL('./optimizer.worker.js',import.meta.url),{type:'module'});
+  optimizerWorker=worker;
+  worker.onmessage=ev=>{
+    const d=ev.data;
+    if(d.id!==id||id!==optimizerJobId)return;
+    if(d.type==='compare-progress'){
+      optimizerProgress='Analysed '+d.done+' of '+d.total+' hypothetical configurations…';
+      const el=document.getElementById('optStatus');
+      if(el)el.textContent=optimizerProgress;
+      updateOptimizerOutput();
+    } else {
+      optimizerBusy=false;worker.terminate();optimizerWorker=null;
+      if(d.type==='compare-done'){
+        comparisonResult=d.results;
+        optimizerProgress='Comparison completed · 5 scenarios.';
+      } else optimizerProgress='Comparison failed: '+(d.message||'Unknown error');
+      mountControls();updateOptimizerOutput();
+    }
+  };
+  worker.onerror=()=>{
+    if(id!==optimizerJobId)return;
+    optimizerBusy=false;optimizerProgress='The comparison worker could not complete.';
+    if(optimizerWorker)optimizerWorker.terminate();optimizerWorker=null;
+    mountControls();updateOptimizerOutput();
+  };
+  worker.postMessage({type:'compare',id});
+}
+function renderComparisonResults(el){
+  const rows=comparisonResult;
+  el.innerHTML='<p>The only inputs optimised here are <b>push force (35–110 N), push duration (0.20–0.45 s) and small seat angle (0° or +4°)</b>. The trolley starts 7% along the available route with zero initial angular velocity. Every row uses the same candidate grid; mechanical parameters stay fixed within each scenario.</p>'+
+    '<div class="scenarioCards">'+rows.map((row,i)=>{
+      const r=row.selected;
+      const both=Boolean(row.bestBoth);
+      const trolley=Boolean(row.bestHome);
+      const status=both?'Both returned':trolley?'Trolley returned':'No full return';
+      const fraction=r?Math.min(100,r.returnFraction*100):0;
+      return '<div class="scenarioCard"><div class="scenarioCardTop"><strong>'+row.name+'</strong><span class="'+(both?'scenarioSuccess':'scenarioNotSuccess')+'">'+status+'</span></div>'+
+        '<p>'+row.description+'</p>'+
+        '<div class="scenarioBig"><strong>'+fraction.toFixed(0)+'%</strong><span>of route back to launch</span></div>'+
+        '<div class="scenarioDetails">Best tested: '+(r?r.params.pushForce.toFixed(0)+' N × '+r.params.pushDuration.toFixed(2)+' s · '+r.params.initialSwing.toFixed(0)+'° initial tilt':'no admissible rebound')+'</div>'+
+        '<div class="scenarioDetails">Return distance: '+(r?r.returnDistance.toFixed(2)+' m':'—')+' · Spring compression: '+(r?(r.springTravel*100).toFixed(1)+' cm':'—')+'</div>'+
+        '<button class="secondary optScenarioReplay" data-scenario="'+row.scenarioId+'" '+(!r?'disabled':'')+'>▶ Replay this case in 3D</button>'+
+        '</div>';
+    }).join('')+'</div>'+
+    '<p class="optVerdict">A full return is possible in the simplified model only for a near-level, very low-loss configuration in this candidate grid. That is a conditional mathematical result, <b>not</b> evidence that the actual playground equipment is safe or capable of this behaviour. Small changes in spring damping can eliminate the return.</p>'+
+    '<div class="optButtons"><button class="primary" id="showDemonstration">▶ Play both-return example</button><button class="secondary" id="rerunCompare">↺ Recalculate</button></div>';
+  el.querySelectorAll('[data-scenario]').forEach(button=>button.addEventListener('click',()=>{
+    const row=rows.find(d=>d.scenarioId===button.dataset.scenario);
+    if(row?.selected)applyLaunch(row.scenarioId,row.selected.params);
+  }));
+  el.querySelector('#rerunCompare').addEventListener('click',startComparison);
+  el.querySelector('#showDemonstration').addEventListener('click',()=>applyLaunch(DEMONSTRATION.scenarioId,DEMONSTRATION));
+}
+
 function forcePlot(sweep){
   if(!sweep?.length)return '';
   const top=Math.max(.01,...sweep.filter(d=>d.valid).map(d=>d.returnDistance));
@@ -248,7 +332,7 @@ function forcePlot(sweep){
     '<line x1="22" y1="132" x2="490" y2="132" stroke="#708a95"/>'+
     '<text x="22" y="15" font-size="11" fill="#9fb8c2">'+top.toFixed(1)+' m</text>'+
     '<text x="22" y="153" font-size="11" fill="#9fb8c2">0 N</text>'+
-    '<text x="489" y="153" text-anchor="end" font-size="11" fill="#9fb8c2">150 N</text>'+
+    '<text x="489" y="153" text-anchor="end" font-size="11" fill="#9fb8c2">110 N</text>'+
     '<path d="'+trace+'" fill="none" stroke="#6fe6bb" stroke-width="2.6"/>'+
     sweep.filter(d=>d.valid).map(d=>'<circle cx="'+X(d.force)+'" cy="'+Y(d.returnDistance)+'" r="3.5" fill="#88efd1"/>').join('')+
     '</svg>';
@@ -260,11 +344,14 @@ function updateOptimizerOutput(){
     el.innerHTML='<p><b>Simulating launch candidates…</b> '+optimizerProgress+'</p><p>The 3D scene remains responsive while the numerical search runs in a worker.</p>';
     return;
   }
+  if(comparisonResult){renderComparisonResults(el);return;}
   const d=optimizationResult;
   if(!d){
-    el.innerHTML='<p>Can we find a launch force and swing phase that return the trolley furthest towards the start, without changing the physical zipwire?</p>'+
-    '<button class="secondary" id="optMainRun">✦ Search for best return</button>';
+    el.innerHTML='<p>Can moderate modelled pushes return both seat and trolley to the starting position? Compare five hypothetical hardware setups, or replay the newly discovered near-level spring example.</p>'+
+    '<div class="optButtons"><button class="primary" id="optCompareMain">◈ Compare hardware scenarios</button><button class="secondary" id="optDemo">▶ Replay 70 N return example</button><button class="secondary" id="optMainRun">✦ Optimise selected setup</button></div>';
     el.querySelector('#optMainRun').addEventListener('click',()=>{tab='optimise';startOptimization();});
+    el.querySelector('#optCompareMain').addEventListener('click',startComparison);
+    el.querySelector('#optDemo').addEventListener('click',()=>applyLaunch(DEMONSTRATION.scenarioId,DEMONSTRATION));
     return;
   }
   if(!d.best){
@@ -284,7 +371,7 @@ function updateOptimizerOutput(){
     (d.nearStartLimit?' The start position is close to the upper end of the search interval.':'');
   el.innerHTML='<div class="optStats"><div><small>Best return</small><strong>'+b.returnDistance.toFixed(2)+' m</strong></div>'+
     '<div><small>Reference launch</small><strong>'+baseline+'</strong></div></div>'+
-    '<p class="optFoot">'+d.feasible+' admissible rebounds / '+d.count+' candidates tested. Optimisation objective: maximise distance travelled back by the <b>trolley</b> from the spring.</p>'+
+    '<p class="optFoot">'+d.feasible+' admissible rebounds / '+d.count+' candidates tested · '+getScenario(d.scenarioId).name+'. Objective: furthest modelled trolley return; compare scenarios separately for returning both trolley and seat.</p>'+
     '<div class="optDetails">'+
     '<div><span>Starting point</span><b>'+(b.params.startFraction*100).toFixed(1)+'% · '+b.releaseHeight.toFixed(2)+' m high</b></div>'+
     '<div><span>Push (force × duration)</span><b>'+b.params.pushForce.toFixed(1)+' N × '+b.params.pushDuration.toFixed(2)+' s</b></div>'+
@@ -303,7 +390,7 @@ function updateOptimizerOutput(){
   el.querySelector('#optReplay').addEventListener('click',replayOptimized);
   el.querySelector('#optRetry').addEventListener('click',()=>{tab='optimise';startOptimization();});
 }
-document.getElementById('optimiseTop').addEventListener('click',()=>{tab='optimise';startOptimization();});
+document.getElementById('optimiseTop').addEventListener('click',()=>{tab='optimise';startComparison();});
 updateOptimizerOutput();
 
 const viewport=document.getElementById('viewport');

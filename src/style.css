@@ -81,3 +81,24 @@ input[type=range]::-webkit-slider-thumb{appearance:none;width:16px;height:16px;b
 .optButtons{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}
 .forcePlot{width:100%;height:173px;overflow:visible}
 @media(max-width:360px){.sidebarTabs .tab{font-size:9px;padding:10px 2px}}
+
+/* Scenario feasibility comparison */
+.scenarioLabel{display:block;color:#9ec6c7;font-size:11px;font-weight:700;margin:15px 0 7px}
+.scenarioSelect{width:100%;border:1px solid #427a6b;background:#193637;color:#e0f6ee;border-radius:9px;padding:12px 9px;font-size:12px}
+.scenarioSelect option{background:#142831}
+.scenarioDescription{color:#a5bfc5;line-height:1.6;font-size:11px;margin:9px 0 12px}
+.scenarioCards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:18px 0}
+.scenarioCard{background:#102931;border:1px solid #37514e;border-radius:12px;padding:14px}
+.scenarioCardTop{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.scenarioCardTop strong{font:700 13px 'Space Grotesk',sans-serif;color:#e3f4ef}
+.scenarioCardTop span{white-space:nowrap;font:700 9px 'DM Sans',sans-serif;border-radius:6px;padding:6px;background:#3a3331;color:#e6c2a5}
+.scenarioCardTop .scenarioSuccess{background:#164f3d;color:#9bf3c8}
+.scenarioCard p{font-size:11px;color:#91aeb5;line-height:1.5;margin:10px 0}
+.scenarioBig{display:flex;align-items:baseline;gap:9px;margin:10px 0}
+.scenarioBig strong{font:700 29px 'Space Grotesk',sans-serif;color:#93efd3}
+.scenarioBig span{color:#8babbb;font-size:11px}
+.scenarioDetails{font-size:11px;color:#c3d9d9;line-height:1.6;margin:5px 0}
+.optScenarioReplay{margin-top:12px;width:100%}
+.viewTag{max-width:53%;white-space:normal;line-height:1.4}
+.inset{max-width:43%;min-width:0}
+@media(max-width:730px){.scenarioCards{grid-template-columns:1fr}.scenarioCardTop{flex-wrap:wrap}.optimizerHeading small{max-width:90px;text-align:right}}
