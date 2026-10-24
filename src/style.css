@@ -102,3 +102,29 @@ input[type=range]::-webkit-slider-thumb{appearance:none;width:16px;height:16px;b
 .viewTag{max-width:53%;white-space:normal;line-height:1.4}
 .inset{max-width:43%;min-width:0}
 @media(max-width:730px){.scenarioCards{grid-template-columns:1fr}.scenarioCardTop{flex-wrap:wrap}.optimizerHeading small{max-width:90px;text-align:right}}
+
+/* Observation-derived spring calibration */
+.sidebarTabs{grid-template-columns:repeat(5,minmax(0,1fr))}
+.sidebarTabs .tab{font-size:10px;padding:10px 1px}
+.calibrationPanel{margin-top:16px;background:#142d37;border:1px solid #3b5c63;border-radius:12px;overflow:hidden;scroll-margin-top:18px}
+.calibrationBody{padding:16px}
+.calibrationBody>p{font-size:12px;line-height:1.7;color:#a8c3cd;margin:0 0 15px}
+.calibrationFields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.calibrationFields label,.frameFields label{display:block;font-size:12px;font-weight:700;color:#dbece8}
+.calibrationFields label span{display:block;margin:4px 0;font-weight:400;font-size:10px;line-height:1.5;color:#85a8b5}
+.calibrationFields input,.frameFields input,.frameFields select{display:block;width:100%;min-width:0;background:#0c2330;border:1px solid #49626c;padding:11px;border-radius:9px;color:#e6f4f0;font-size:13px;margin-top:7px}
+.calibrationFields input::placeholder{color:#718d98}
+.calibrationBody .optButtons{margin:14px 0}
+.calibrationOutput{border:1px dashed #3c666c;border-radius:10px;background:#102632;padding:14px;margin:16px 0;color:#bbd5da;line-height:1.65;font-size:12px}
+.calibrationOutput.calError,.calCaution{color:#f1c3a2!important}
+.calRanges{margin:14px 0;background:#102935;border:1px solid #35515f;padding:12px;border-radius:9px}
+.calRanges strong{color:#d1efdf}
+.calRanges>div{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #294751}
+.calRanges b{color:#8df0ce;text-align:right}
+.calRanges p{font-size:10px;color:#94b6c4}
+.calLoaded{color:#8af0c3!important}
+.frameHelper{border:1px solid #335663;border-radius:9px;padding:13px;margin-top:17px;background:#102631}
+.frameHelper summary{color:#9deacb;cursor:pointer;font-weight:700;font-size:12px}
+.frameHelper p{font-size:11px;line-height:1.6;color:#91b4bc}
+.frameFields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px}
+@media(max-width:690px){.calibrationBody{padding:13px}.calibrationFields{grid-template-columns:1fr}.calibrationPanel .optimizerHeading small{max-width:108px;text-align:right}}

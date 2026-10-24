@@ -3,8 +3,8 @@ import { SCENARIOS, scenarioParams } from './scenarios.js';
 
 let active = 0;
 const chunk = () => new Promise(resolve=>setTimeout(resolve,0));
-async function search(id,scenarioId='reference') {
-  const base=scenarioParams(scenarioId);
+async function search(id,scenarioId='reference',calibrationBase=null) {
+  const base=(scenarioId==='calibrated'&&calibrationBase)?{...calibrationBase}:scenarioParams(scenarioId);
   const candidates = [
     Object.fromEntries(LAUNCH_KEYS.map(k=>[k,base[k]])),
     ...Array.from({length:240},(_,i)=>proposedLaunch(i+1)),
@@ -119,7 +119,7 @@ onmessage=e=>{
   if(e.data?.type==='cancel'){active++;return;}
   if(e.data?.type==='search'||e.data?.type==='compare'){
     const id=e.data.id; active=id;
-    const task=e.data.type==='search'?search(id,e.data.scenarioId):compare(id);
+    const task=e.data.type==='search'?search(id,e.data.scenarioId,e.data.calibrationBase):compare(id);
     task.catch(error=>postMessage({type:'error',id,message:String(error?.message||error)}));
   }
 };

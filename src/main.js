@@ -4,10 +4,15 @@ import { DEFAULTS, cableY, cableSlope, stopX, initialState, makeRun, stepRun, en
 import './style.css';
 import { TEMPLATE, SEARCH_BOUNDS } from './optimizer.js';
 import { SCENARIOS, DEMONSTRATION, getScenario, scenarioParams } from './scenarios.js';
+import { attachCalibrationUI } from './calibration-ui.js';
 
 const p = {...DEFAULTS};
 let run = makeRun(p), playing = false, playbackRate = 1, tab = 'optimise', showTrail = true;
 let optimizerWorker=null, optimizerJobId=0, optimizerBusy=false, optimizationResult=null, comparisonResult=null, selectedScenario='efficient', optimizerProgress='';
+let calibratedBase=null;
+const scenarioName=id=>id==='calibrated'?'Observation-derived spring estimate':getScenario(id).name;
+const scenarioDescription=id=>id==='calibrated'?'Unvalidated spring estimates fitted to observations, with existing geometry and masses unchanged.':getScenario(id).description;
+const activeScenarioBase=id=>id==='calibrated'&&calibratedBase?{...calibratedBase}:scenarioParams(id);
 let currentScene = null, lastFrame = performance.now(), frameAccum = 0, trailPoints = [];
 const app = document.getElementById('app');
 
@@ -98,10 +103,14 @@ function pretty(v,step) {
 }
 function mountControls(){
   const tabs=document.getElementById('tabs');
-  tabs.innerHTML=['geometry','dynamics','launch','optimise'].map(k=>'<button class="tab '+(tab===k?'active':'')+'" data-tab="'+k+'">'+({geometry:'Geometry',dynamics:'Physics',launch:'Launch',optimise:'Optimise'}[k])+'</button>').join('');
-  tabs.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{tab=b.dataset.tab;mountControls();}));
+  tabs.innerHTML=['geometry','dynamics','launch','optimise','calibrate'].map(k=>'<button class="tab '+(tab===k?'active':'')+'" data-tab="'+k+'">'+({geometry:'Geometry',dynamics:'Physics',launch:'Launch',optimise:'Optimise',calibrate:'Calibrate'}[k])+'</button>').join('');
+  tabs.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{tab=b.dataset.tab;mountControls();if(tab==='calibrate')calibrationUI.open();}));
   const wrap=document.getElementById('controls');wrap.innerHTML='';
   if(tab==='optimise'){renderOptimizerControls(wrap);return;}
+  if(tab==='calibrate'){
+    wrap.innerHTML='<div class="optimiserSidebar"><div class="groupTitle"><i>◉</i> Passive observation</div><p class="muted">The spring cannot be calibrated from photographs alone. Enter observed approach and rebound speeds, maximum compression and assumed effective mass. The model reports the uncertainty explicitly.</p><button class="primary optFull" id="calJump">↘ Open measurement form</button><p class="sideNote">Use existing ordinary-use footage or manufacturer data. No deliberate impacts, equipment modification or contact with the spring.</p></div>';
+    wrap.querySelector('#calJump').addEventListener('click',()=>calibrationUI.open());return;
+  }
   groups[tab].forEach(g=>{
     const group=document.createElement('section');group.className='group';
     group.innerHTML='<div class="groupTitle"><i>'+g.symbol+'</i>'+g.title+'</div>';
@@ -163,14 +172,14 @@ document.getElementById('trailButton').addEventListener('click',e=>{
 // Separate worker computes an actual bounded search over the same physics
 // integrator; do not confuse the selected candidate with a certified optimum.
 function renderOptimizerControls(node){
-  const chosen=getScenario(selectedScenario),base=scenarioParams(selectedScenario);
+  const base=activeScenarioBase(selectedScenario);
   node.innerHTML='<div class="optimiserSidebar"><div class="groupTitle"><i>✦</i> Hardware scenarios</div>'+
     '<p class="muted">Compare hypothetical equipment changes, then optimise only the launch. None are measurements of the playground.</p>'+
     '<label class="scenarioLabel" for="scenarioChoice">Choose model configuration</label>'+
     '<select class="scenarioSelect" id="scenarioChoice">'+SCENARIOS.map(c=>
       '<option value="'+c.id+'" '+(c.id===selectedScenario?'selected':'')+'>'+c.name+'</option>'
-    ).join('')+'</select>'+
-    '<p class="scenarioDescription">'+chosen.description+'</p>'+
+    ).join('')+(calibratedBase?'<option value="calibrated" '+(selectedScenario==='calibrated'?'selected':'')+'>Observation-derived spring estimate</option>':'')+'</select>'+
+    '<p class="scenarioDescription">'+scenarioDescription(selectedScenario)+'</p>'+
     '<div class="fixedList"><strong>Fixed for this launch search</strong>'+
     '<div><span>Span / net drop</span><b>'+base.length.toFixed(1)+' m / '+base.drop.toFixed(2)+' m</b></div>'+
     '<div><span>Moving mass</span><b>'+(base.trolleyMass+base.seatMass)+' kg</b></div>'+
@@ -204,14 +213,14 @@ function cancelOptimization(){
 }
 function loadTemplate(){
   cancelOptimization();
-  Object.assign(p,scenarioParams(selectedScenario));
+  Object.assign(p,activeScenarioBase(selectedScenario));
   optimizationResult=null;comparisonResult=null;playing=false;run=makeRun(p);
   frameAccum=0;trailPoints=[];
   mountControls();buildStatic();updateDynamics(run.state);updateTelemetry();updateOptimizerOutput();
 }
 function startOptimization(){
   loadTemplate();
-  optimizerBusy=true;optimizerProgress='Evaluating '+getScenario(selectedScenario).name+'…';
+  optimizerBusy=true;optimizerProgress='Evaluating '+scenarioName(selectedScenario)+'…';
   mountControls();updateOptimizerOutput();
   const id=++optimizerJobId;
   const worker=new Worker(new URL('./optimizer.worker.js',import.meta.url),{type:'module'});
@@ -239,11 +248,11 @@ function startOptimization(){
     if(optimizerWorker)optimizerWorker.terminate();
     optimizerWorker=null;mountControls();updateOptimizerOutput();
   };
-  worker.postMessage({type:'search',id,scenarioId:selectedScenario});
+  worker.postMessage({type:'search',id,scenarioId:selectedScenario,calibrationBase:selectedScenario==='calibrated'?calibratedBase:null});
 }
 function replayOptimized(){
   if(!optimizationResult?.best)return;
-  Object.assign(p,scenarioParams(optimizationResult.scenarioId),optimizationResult.best.params);
+  Object.assign(p,activeScenarioBase(optimizationResult.scenarioId),optimizationResult.best.params);
   playing=true;run=makeRun(p);frameAccum=0;trailPoints=[];
   tab='launch';mountControls();buildStatic();updateDynamics(run.state);updateTelemetry();
   document.getElementById('viewport').scrollIntoView({block:'nearest',behavior:'smooth'});
@@ -252,7 +261,7 @@ function replayOptimized(){
 function applyLaunch(scenarioId,settings){
   cancelOptimization();
   selectedScenario=scenarioId;
-  Object.assign(p,scenarioParams(scenarioId),settings);
+  Object.assign(p,activeScenarioBase(scenarioId),settings);
   playing=true;run=makeRun(p);frameAccum=0;trailPoints=[];
   tab='launch';mountControls();buildStatic();updateDynamics(run.state);updateTelemetry();
   document.getElementById('viewport').scrollIntoView({block:'nearest',behavior:'smooth'});
@@ -371,7 +380,7 @@ function updateOptimizerOutput(){
     (d.nearStartLimit?' The start position is close to the upper end of the search interval.':'');
   el.innerHTML='<div class="optStats"><div><small>Best return</small><strong>'+b.returnDistance.toFixed(2)+' m</strong></div>'+
     '<div><small>Reference launch</small><strong>'+baseline+'</strong></div></div>'+
-    '<p class="optFoot">'+d.feasible+' admissible rebounds / '+d.count+' candidates tested · '+getScenario(d.scenarioId).name+'. Objective: furthest modelled trolley return; compare scenarios separately for returning both trolley and seat.</p>'+
+    '<p class="optFoot">'+d.feasible+' admissible rebounds / '+d.count+' candidates tested · '+scenarioName(d.scenarioId)+'. Objective: furthest modelled trolley return; compare scenarios separately for returning both trolley and seat.</p>'+
     '<div class="optDetails">'+
     '<div><span>Starting point</span><b>'+(b.params.startFraction*100).toFixed(1)+'% · '+b.releaseHeight.toFixed(2)+' m high</b></div>'+
     '<div><span>Push (force × duration)</span><b>'+b.params.pushForce.toFixed(1)+' N × '+b.params.pushDuration.toFixed(2)+' s</b></div>'+
@@ -390,6 +399,26 @@ function updateOptimizerOutput(){
   el.querySelector('#optReplay').addEventListener('click',replayOptimized);
   el.querySelector('#optRetry').addEventListener('click',()=>{tab='optimise';startOptimization();});
 }
+
+// The observation form starts empty. Applying a provisional inverse fit updates
+// only the spring, not the mass, structure, rolling resistance, or force bounds.
+// The worker must receive this same calibrated configuration explicitly.
+function applyObservedFit(fitted,optimize){
+  cancelOptimization();
+  calibratedBase={...p,springK:fitted.stiffness,springDamping:fitted.damping};
+  selectedScenario='calibrated';
+  Object.assign(p,calibratedBase);
+  optimizationResult=null;comparisonResult=null;
+  playing=false;run=makeRun(p);trailPoints=[];frameAccum=0;
+  tab=optimize?'optimise':'calibrate';
+  mountControls();buildStatic();updateDynamics(run.state);updateTelemetry();updateOptimizerOutput();
+  if(optimize)startOptimization();
+}
+const calibrationUI=attachCalibrationUI({
+  onApply:applyObservedFit,
+  getMovingMass:()=>p.trolleyMass+p.seatMass
+});
+
 document.getElementById('optimiseTop').addEventListener('click',()=>{tab='optimise';startComparison();});
 updateOptimizerOutput();
 

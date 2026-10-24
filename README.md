@@ -49,3 +49,14 @@ and seat to their initial coordinates. This result also survives 120 Hz
 and 480 Hz step-size checks, but is extremely sensitive to damping and may
 not be physically achievable with the real installed safety stop.
 Do not adjust public equipment or use the values as safe operating limits.
+
+
+## Calibrate from observations (V4)
+
+The **Calibrate** tab opens a passive measurement workspace. Input fields are blank until observations are supplied. Enter the trolley speeds just before spring contact and just after spring separation, the observed peak spring stroke in centimetres and a separately estimated effective moving mass in kg. An optional contact duration checks model consistency; a distance-frames-fps helper converts existing recorded motion to speed.
+
+The inverse identification is a *single underdamped Kelvin–Voigt mass–spring–damper approximation*, not a fit of the full suspended-pendulum/cable system. It calculates effective spring stiffness, damping, velocity restitution and isolated-model energy return. It also perturbs speed by ±10%, stroke by ±12% and effective mass by ±20% to illustrate sensitivity, not statistical confidence.
+
+Apply estimate overwrites only current simulated spring parameters and creates a distinct **Observation-derived spring estimate** scenario. Apply & optimise reruns the bounded launch search with those same estimated parameters passed to the worker, rather than reverting to the unmeasured reference. No uploads, tracking or browser persistence; page refresh clears measurements. Underlying hardware geometry, moving masses and wheel friction remain the current model values and require independent calibration.
+
+**Only analyse recordings of ordinary, permitted use. Do not create harder impacts, interact with the moving spring or alter public playground equipment.** A single bounce cannot identify the true end-stop safety performance because the swinging seat, wheels and cable exchange energy. Do not use the app to prescribe safe operating forces.
