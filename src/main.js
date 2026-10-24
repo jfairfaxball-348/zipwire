@@ -171,7 +171,7 @@ function renderOptimizerControls(node){
     '<div><span>Spring damping</span><b>'+TEMPLATE.springDamping+' Ns/m</b></div>'+
     '<div><span>Midspan sag</span><b>'+TEMPLATE.sag+' m</b></div></div>'+
     '<button class="secondary optFull" id="optLoad">↺ Reset to template</button>'+
-    '<button class="primary optFull" id="optRun" '+(optimizerBusy?'disabled':'')+'>✦ '+(optimizerBusy?'Searching…':'Find optimum')+'</button>'+
+    '<button class="primary optFull" id="optRun" '+(optimizerBusy?'disabled':'')+'>✦ '+(optimizerBusy?'Searching…':'Find best tested return')+'</button>'+
     '<button class="secondary optFull '+(optimizerBusy?'':'hidden')+'" id="optCancel">Cancel</button>'+
     '<div id="optStatus" class="optimiserStatus" aria-live="polite">'+(optimizerProgress||'Ready for mathematical search.')+'</div>'+
     '<div class="searchBounds"><strong>Search dimensions</strong><div>Push force: 0–150 N</div>'+
@@ -276,10 +276,12 @@ function updateOptimizerOutput(){
   const b=d.best;
   const baseline=d.baseline?.valid?d.baseline.returnDistance.toFixed(2)+' m':'No valid return';
   const conclusion=d.interiorSweepPeak?
-    'The force-only sweep shows a possible interior peak for this particular swing phase. It is not evidence of a globally unique optimum.':
+    'The force-only sweep has a possible interior peak for these swing settings, not a proven global optimum.':
     d.nearForceLimit?
-    'The best candidate uses the highest tested force range; this search has not found a natural interior force optimum.':
-    'The best sampled force is inside the range, but the search is finite and cannot establish a globally optimal force.';
+    'The strongest result is at the largest tested force, so the search did not establish an interior force optimum.':
+    'The best sampled force is interior, but a finite search does not prove a globally optimal force.';
+  const boundaries=(d.nearSwingLimit?' The result is very close to the assumed 50° maximum swing filter.':'')+
+    (d.nearStartLimit?' The start position is close to the upper end of the search interval.':'');
   el.innerHTML='<div class="optStats"><div><small>Best return</small><strong>'+b.returnDistance.toFixed(2)+' m</strong></div>'+
     '<div><small>Reference launch</small><strong>'+baseline+'</strong></div></div>'+
     '<p class="optFoot">'+d.feasible+' admissible rebounds / '+d.count+' candidates tested. Optimisation objective: maximise distance travelled back by the <b>trolley</b> from the spring.</p>'+
@@ -289,11 +291,12 @@ function updateOptimizerOutput(){
     '<div><span>Initial swing angle</span><b>'+b.params.initialSwing.toFixed(1)+'°</b></div>'+
     '<div><span>Initial swing rate</span><b>'+b.params.initialSwingRate.toFixed(1)+'°/s</b></div>'+
     '<div><span>Spring compression</span><b>'+(b.springTravel*100).toFixed(1)+' cm</b></div>'+
+    '<div><span>Maximum modelled swing</span><b>'+b.maxSwing.toFixed(1)+'° (50° filter)</b></div>'+
     '<div><span>Trolley back to launch?</span><b>'+(b.trolleyReturned?'Yes':'Not yet')+'</b></div>'+
     '<div><span>Seat centre back to launch?</span><b>'+(b.seatReturned?'Yes':'Not yet')+'</b></div>'+
     '</div><p><b>Force response, other settings held fixed</b></p>'+
     '<p class="optFoot">Blank portions represent runs rejected by the model.</p>'+forcePlot(d.sweep)+
-    '<p class="optVerdict">'+conclusion+'</p>'+
+    '<p class="optVerdict">'+conclusion+boundaries+'</p>'+
     '<div class="optButtons"><button class="primary" id="optReplay">▶ Replay best in 3D</button>'+
     '<button class="secondary" id="optRetry">↺ Optimise again</button></div>'+
     '<p class="optFoot">These are not measured or safe operating limits. The optimiser can exploit preloaded pendulum energy, and the photo-based spring dynamics are uncalibrated. A model optimum is not a recommendation to push real playground equipment.</p>';

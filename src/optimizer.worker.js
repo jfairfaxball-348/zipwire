@@ -44,11 +44,18 @@ async function search(id) {
   const baseline=evaluateLaunch(base,base);
   const sweep=[];
   if(best){
-    for(let i=0;i<=12;i++){
-      const force=SEARCH_BOUNDS.pushForce[1]*i/12;
+    // A sparse grid may miss a narrow force/swing-phase resonance.
+    const coarse=Array.from({length:13},(_,i)=>SEARCH_BOUNDS.pushForce[1]*i/12);
+    const local=[-12,-10,-8,-6,-4,-3,-2,-1,0,1,2,3,4,6,8,10,12]
+      .map(delta=>best.params.pushForce+delta);
+    const forces=[...new Set([...coarse,...local]
+      .map(v=>Math.round(Math.min(SEARCH_BOUNDS.pushForce[1],Math.max(0,v))*1000)/1000))]
+      .sort((a,b)=>a-b);
+    for(let i=0;i<forces.length;i++){
+      const force=forces[i];
       const result=evaluateLaunch(base,{...best.params,pushForce:force});
       sweep.push({force,valid:result.valid,returnDistance:result.valid?result.returnDistance:null,reason:result.reason});
-      if(i%4===0)await chunk();
+      if(i%5===0)await chunk();
       if(id!==active)return;
     }
   }
@@ -61,6 +68,8 @@ async function search(id) {
   postMessage({
     type:'done', id, count, feasible,best,baseline,sweep,
     nearForceLimit:nearForceLimit(best),
+    nearSwingLimit:Boolean(best && best.maxSwing>=49),
+    nearStartLimit:Boolean(best && best.params.startFraction>=SEARCH_BOUNDS.startFraction[1]-.005),
     interiorSweepPeak,base
   });
 }
