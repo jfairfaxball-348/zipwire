@@ -118,3 +118,15 @@ and spring rebound are coupled. Also, minimizing average applied force
 with variable duration is not identical to minimizing energy or impulse.
 Manufacturer-specified limits and calibrated observations are required
 before any real-world safety interpretation.
+
+
+## Typeset minimum-force equation (V6.1)
+
+The one-tap minimum-force button now renders a two-line constrained optimisation
+formula using KaTeX: a sampled minimum force over push durations and initial
+seat angles, subject to **both** trolley and seat centre returning to their
+starting positions after spring separation. The hat over F indicates a finite
+numerical estimate, not a proved global optimum. KaTeX is packaged locally
+in the Vite build (no external maths rendering server). The formula is
+presentational; the same worker-based optimisation and auto-release remain in
+place.

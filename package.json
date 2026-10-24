@@ -10,7 +10,8 @@
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
-    "three": "^0.180.0"
+    "three": "^0.180.0",
+    "katex": "^0.19.0"
   },
   "devDependencies": {
     "vite": "^7.1.12"

@@ -1,4 +1,7 @@
 import { MIN_PUSH_SETTINGS } from './min-push.js';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
+import { OPTIMAL_FORCE_OBJECTIVE, RETURN_CONSTRAINTS } from './min-push-formula.js';
 
 // A single, always-visible action. Uses an isolated worker so the Three.js
 // animation never blocks while the minimum-force grid is searched.
@@ -8,15 +11,26 @@ export function attachMinimumPushUI({getParams,onSearchStart,onLaunch,onLoadDemo
   section.innerHTML=[
     '<div class="minPushTop"><div><strong>↶ Minimum-force return</strong>',
     '<p>Find a modelled push that brings <b>both trolley and seat</b> back to their release positions. Keep the present wire, mass, spring, start point and wind unchanged.</p></div></div>',
-    '<button id="minPushButton" class="minPushButton" type="button">',
-    '<span class="minPushMath">F* ≈ min { F : xₜ,return ≤ xₜ,start ∧ xₛ,return ≤ xₛ,start }</span>',
-    '<span class="minPushButtonAction">▶ Calculate optimal push &amp; auto-launch</span></button>',
+    '<button id="minPushButton" class="minPushButton" type="button" aria-label="Find the minimum modelled push force that returns the trolley and seat, then automatically launch the 3D simulation">',
+    '<span class="minPushKicker">✧ THE CONSTRAINED RETURN OPTIMISATION</span>',
+    '<span class="minPushFormulaStack">',
+    '<span class="minPushObjective" id="minPushObjective" aria-hidden="true"></span>',
+    '<span class="minPushFormulaDivider"></span>',
+    '<span class="minPushConstraints" id="minPushConstraints" aria-hidden="true"></span>',
+    '</span>',
+    '<span class="minPushButtonAction"><span class="minPushArrow">↗</span> COMPUTE F<sub>★</sub> &amp; RELEASE</span>',
+    '<span class="minPushActionSubtitle">Minimise push force · Satisfy both return conditions</span></button>',
     '<div id="minPushStatus" class="minPushStatus" role="status" aria-live="polite">Ready · lowest feasible force on the sampled launch grid (0–110 N).</div>',
     '<div class="minPushActions"><button type="button" id="minPushCancel" class="secondary" disabled>Stop search</button>',
     '<button type="button" id="minPushDemo" class="secondary">Load 15 m return example &amp; find push</button></div>',
     '<p class="minPushDisclaimer">Numerical approximation, <b>not</b> a proven global optimum. Tests constant-force pushes, 0.20–0.45 s durations and seat angles −6° to +6° with zero initial swing rate. Not a playground force or safety recommendation.</p>'
   ].join('');
   document.querySelector('.playback').insertAdjacentElement('afterend',section);
+  // Mathematical typography is rendered locally; no remote LaTeX service.
+  katex.render(OPTIMAL_FORCE_OBJECTIVE, section.querySelector('#minPushObjective'),
+    {displayMode:true,throwOnError:true,output:'htmlAndMathml',strict:false});
+  katex.render(RETURN_CONSTRAINTS, section.querySelector('#minPushConstraints'),
+    {displayMode:true,throwOnError:true,output:'htmlAndMathml',strict:false});
   const button=section.querySelector('#minPushButton'),
     status=section.querySelector('#minPushStatus'),
     stop=section.querySelector('#minPushCancel');
