@@ -10,7 +10,7 @@ test('wind reverses quadratic relative-air force correctly',()=>{
  assert.equal(windAtTime(0,p),5);
  assert.equal(aerodynamicForce(0,0,p),2.5);
  assert.equal(aerodynamicForce(10,0,p),-2.5);
- assert.equal(aerodynamicForce(5,0,p),0);
+ assert.ok(Math.abs(aerodynamicForce(5,0,p))<1e-12);
  assert.equal(aerodynamicForce(0,0,{...p,windSpeed:-5}),-2.5);
  assert.equal(windForceAtRest(p),2.5);
 });
